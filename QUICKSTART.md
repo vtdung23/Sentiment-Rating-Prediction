@@ -2,19 +2,34 @@
 
 ## Installation
 
-1. **Install dependencies:**
+1. **Tạo môi trường ảo (Virtual Environment):**
+
+   **Option A - Dùng Conda:**
+   ```bash
+   conda create -p ./env python=3.10 -y
+   conda activate ./env
+   ```
+
+   **Option B - Dùng venv:**
+   ```bash
+   python -m venv env
+   # Windows:
+   env\Scripts\activate
+   # Linux/Mac:
+   source env/bin/activate
+   ```
+
+2. **Install dependencies:**
 ```bash
 pip install -r requirements.txt
 ```
 
-2. **Run the application:**
+3. **Run the application:**
 ```bash
 python main.py
 ```
 
-3. **Access the application:**
-# Nhớ kích hoạt môi trường trước
-conda activate ./env
+4. **Access the application:**
 - Dashboard: http://localhost:8000
 - **Swagger API Docs: http://localhost:8000/docs** ⭐ (Show this to your teacher!)
 - ReDoc: http://localhost:8000/redoc
@@ -112,5 +127,10 @@ Close any other instances of the app and restart.
 ✅ **Batch Processing** (CSV upload/download)  
 ✅ **Responsive UI** (TailwindCSS)  
 ✅ **Database Integration** (SQLite with history tracking)  
+
+
+Push lên GitHub: git push github main
+Push lên Hugging Face: git push origin main
+Push cả 2: git push github main && git push origin main
 
 Good luck! 🎓
