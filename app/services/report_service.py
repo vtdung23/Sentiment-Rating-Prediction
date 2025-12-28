@@ -31,25 +31,95 @@ class ReportService:
     
     def __init__(self):
         self.styles = getSampleStyleSheet()
-        self._setup_custom_styles()
         self._setup_fonts()
+        self._setup_custom_styles()
+    
+    def _get_font_path(self):
+        """Get font path based on OS"""
+        import platform
+        import os
+        
+        system = platform.system()
+        
+        # Define possible font paths for different OS
+        font_paths = {
+            'Linux': [
+                '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+                '/usr/share/fonts/TTF/DejaVuSans.ttf',
+            ],
+            'Windows': [
+                'C:/Windows/Fonts/arial.ttf',
+                'C:/Windows/Fonts/segoeui.ttf',
+                'C:/Windows/Fonts/tahoma.ttf',
+            ],
+            'Darwin': [  # macOS
+                '/Library/Fonts/Arial.ttf',
+                '/System/Library/Fonts/Helvetica.ttc',
+            ]
+        }
+        
+        font_bold_paths = {
+            'Linux': [
+                '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+                '/usr/share/fonts/TTF/DejaVuSans-Bold.ttf',
+            ],
+            'Windows': [
+                'C:/Windows/Fonts/arialbd.ttf',
+                'C:/Windows/Fonts/segoeuib.ttf',
+                'C:/Windows/Fonts/tahomabd.ttf',
+            ],
+            'Darwin': [
+                '/Library/Fonts/Arial Bold.ttf',
+            ]
+        }
+        
+        paths = font_paths.get(system, font_paths['Linux'])
+        bold_paths = font_bold_paths.get(system, font_bold_paths['Linux'])
+        
+        font_path = None
+        font_bold_path = None
+        
+        for path in paths:
+            if os.path.exists(path):
+                font_path = path
+                break
+        
+        for path in bold_paths:
+            if os.path.exists(path):
+                font_bold_path = path
+                break
+        
+        return font_path, font_bold_path
     
     def _setup_fonts(self):
         """Setup fonts for Vietnamese character support"""
+        self.font_name = 'Helvetica'
+        self.font_name_bold = 'Helvetica-Bold'
+        
         try:
-            # Try to use DejaVu font which supports Vietnamese characters
-            pdfmetrics.registerFont(TTFont('DejaVu', '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'))
-            # Register bold variant
-            pdfmetrics.registerFont(TTFont('DejaVuBold', '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'))
+            font_path, font_bold_path = self._get_font_path()
+            
+            if font_path:
+                pdfmetrics.registerFont(TTFont('CustomFont', font_path))
+                self.font_name = 'CustomFont'
+                print(f"✅ Loaded font: {font_path}")
+            
+            if font_bold_path:
+                pdfmetrics.registerFont(TTFont('CustomFontBold', font_bold_path))
+                self.font_name_bold = 'CustomFontBold'
+                print(f"✅ Loaded bold font: {font_bold_path}")
+                
         except Exception as e:
-            # If fonts not found, continue with default fonts
-            print(f"Warning: Could not load Vietnamese fonts: {e}")
+            # If fonts not found, use default Helvetica
+            print(f"⚠️ Using default fonts (Helvetica): {e}")
+            self.font_name = 'Helvetica'
+            self.font_name_bold = 'Helvetica-Bold'
     
     def _setup_custom_styles(self):
         """Setup custom paragraph styles"""
-        # Use DejaVu font for Vietnamese support, fallback to Helvetica
-        font_name = 'DejaVu'
-        font_name_bold = 'DejaVuBold'
+        # Use dynamically loaded fonts
+        font_name = self.font_name
+        font_name_bold = self.font_name_bold
         
         self.styles.add(ParagraphStyle(
             name='CustomTitle',
