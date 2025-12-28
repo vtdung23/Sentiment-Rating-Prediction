@@ -249,7 +249,7 @@ class MLPredictionService:
     def predict_with_explanation(self, text: str) -> Dict[str, Any]:
         """
         Predict rating with explanation (word importance scores)
-        Uses gradient-based attribution for interpretability
+        Uses keyword-based importance for interpretability (safer than gradients)
         """
         # Lazy load model on first request
         self._load_model()
@@ -259,7 +259,6 @@ class MLPredictionService:
         
         # 1. Vietnamese preprocessing
         processed_text = self.preprocess(text)
-        words = processed_text.split()
         
         # 2. Tokenize
         encoded = self.tokenizer(
@@ -273,64 +272,51 @@ class MLPredictionService:
         # Move tensors to device
         encoded = {k: v.to(self.device) for k, v in encoded.items()}
         
-        # 3. Get embeddings and enable gradient computation
-        embeddings = self.model.roberta.embeddings(encoded['input_ids'])
-        embeddings.requires_grad_(True)
-        
-        # 4. Forward pass with embeddings
-        with torch.enable_grad():
-            outputs = self.model.roberta.encoder(embeddings)
-            sequence_output = outputs.last_hidden_state
-            logits = self.model.classifier(sequence_output)
+        # 3. Standard inference (no gradients needed)
+        with torch.no_grad():
+            outputs = self.model(**encoded)
+            logits = outputs.logits
             probs = F.softmax(logits, dim=1)
             
             # Get predicted class
             predicted_class = torch.argmax(probs, dim=1).item()
             confidence = probs[0][predicted_class].item()
-            
-            # Compute gradient for the predicted class
-            target_score = probs[0][predicted_class]
-            target_score.backward()
-            
-            # Get gradient-based importance
-            gradients = embeddings.grad
-            importance = gradients.abs().sum(dim=-1).squeeze()
         
-        # 5. Map importance to words (simplified - using tokenizer alignment)
+        # 4. Keyword-based importance (more reliable than gradient-based)
         tokens = self.tokenizer.convert_ids_to_tokens(encoded['input_ids'][0])
-        token_importance = importance.detach().cpu().numpy()
         
-        # Normalize importance scores
-        if token_importance.max() > 0:
-            token_importance = token_importance / token_importance.max()
-        
-        # Map to original words (simplified approach)
+        # Calculate importance based on keyword presence and position
         word_importance = []
         for i, token in enumerate(tokens):
-            if token not in ['<s>', '</s>', '<pad>']:
-                # Assign positive/negative based on keyword analysis
-                keyword_analysis = self.keyword_analyzer.analyze(token)
-                base_score = float(token_importance[i])
+            if token not in ['<s>', '</s>', '<pad>', '<unk>']:
+                # Clean token (remove BPE markers)
+                clean_token = token.replace('@@', '').replace('▁', '').strip()
+                if not clean_token:
+                    continue
+                    
+                # Check if token is a keyword
+                is_positive = any(kw in clean_token.lower() or clean_token.lower() in kw 
+                                  for kw in self.keyword_analyzer.positive_words)
+                is_negative = any(kw in clean_token.lower() or clean_token.lower() in kw 
+                                  for kw in self.keyword_analyzer.negative_words)
                 
-                if keyword_analysis['positive_count'] > 0:
-                    word_importance.append({
-                        'word': token,
-                        'score': base_score  # Positive contribution
-                    })
-                elif keyword_analysis['negative_count'] > 0:
-                    word_importance.append({
-                        'word': token,
-                        'score': -base_score  # Negative contribution
-                    })
+                # Assign importance score
+                if is_positive:
+                    score = 0.8 + (0.2 * (1 - i / len(tokens)))  # Decay by position
+                elif is_negative:
+                    score = -(0.8 + (0.2 * (1 - i / len(tokens))))
                 else:
-                    word_importance.append({
-                        'word': token,
-                        'score': base_score * (0.5 if predicted_class >= 2 else -0.5)
-                    })
+                    # Neutral words get small score based on prediction
+                    score = 0.2 if predicted_class >= 2 else -0.2
+                
+                word_importance.append({
+                    'word': clean_token,
+                    'score': round(score, 3)
+                })
         
         rating = predicted_class + 1
         
-        # Also get keyword analysis for the full text
+        # Get keyword analysis for the full text
         keyword_analysis = self.keyword_analyzer.analyze(text)
         
         return {
