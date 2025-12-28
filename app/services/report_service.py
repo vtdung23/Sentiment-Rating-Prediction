@@ -226,12 +226,12 @@ class ReportService:
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4F46E5')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'DejaVuBold'),
+            ('FONTNAME', (0, 0), (-1, 0), self.font_name_bold),
             ('FONTSIZE', (0, 0), (-1, 0), 12),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
             ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('FONTNAME', (0, 1), (-1, -1), 'DejaVu'),
+            ('FONTNAME', (0, 1), (-1, -1), self.font_name),
             ('FONTSIZE', (0, 1), (-1, -1), 10)
         ]))
         story.append(summary_table)
@@ -270,12 +270,12 @@ class ReportService:
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4F46E5')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'DejaVuBold'),
+            ('FONTNAME', (0, 0), (-1, 0), self.font_name_bold),
             ('FONTSIZE', (0, 0), (-1, 0), 11),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
             ('BACKGROUND', (0, 1), (-1, -1), colors.lightgrey),
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('FONTNAME', (0, 1), (-1, -1), 'DejaVu'),
+            ('FONTNAME', (0, 1), (-1, -1), self.font_name),
             ('FONTSIZE', (0, 1), (-1, -1), 10)
         ]))
         story.append(dist_table)
@@ -342,13 +342,13 @@ class ReportService:
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (0, -1), 'LEFT'),
             ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'DejaVuBold'),
+            ('FONTNAME', (0, 0), (-1, 0), self.font_name_bold),
             ('FONTSIZE', (0, 0), (-1, 0), 10),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
             ('BACKGROUND', (0, 1), (-1, -1), colors.lightgrey),
             ('GRID', (0, 0), (-1, -1), 1, colors.grey),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.lightgrey]),
-            ('FONTNAME', (0, 1), (-1, -1), 'DejaVu'),
+            ('FONTNAME', (0, 1), (-1, -1), self.font_name),
             ('FONTSIZE', (0, 1), (-1, -1), 9),
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),  # Top alignment for wrapped text
             ('LEFTPADDING', (0, 0), (-1, -1), 8),
