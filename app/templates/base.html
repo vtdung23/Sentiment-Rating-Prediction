@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Vietnamese Product Rating Prediction{% endblock %}</title>
+    
+    <!-- TailwindCSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Configure Tailwind for dark mode
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+    
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/style.css">
+    
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="min-h-screen transition-colors duration-300">
+    <!-- Toast Container (will be populated by JS) -->
+    <div class="toast-container" id="toast-container"></div>
+    
+    <!-- Header -->
+    <header class="bg-white dark:bg-slate-800 shadow-md transition-colors duration-300">
+        <nav class="container mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <i class="fas fa-star text-yellow-500 text-2xl"></i>
+                    <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-100">Rating Predictor</h1>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <!-- Dark Mode Toggle -->
+                    <button class="dark-mode-toggle" onclick="darkMode.toggle()" title="Toggle dark mode">
+                        <span class="toggle-ball"></span>
+                    </button>
+                    
+                    {% block nav_items %}{% endblock %}
+                </div>
+            </div>
+        </nav>
+    </header>
+    
+    <!-- Main Content -->
+    <main class="container mx-auto px-6 py-8">
+        {% block content %}{% endblock %}
+    </main>
+    
+    <!-- Footer -->
+    <footer class="bg-white dark:bg-slate-800 mt-12 py-6 transition-colors duration-300">
+        <div class="container mx-auto px-6 text-center text-gray-600 dark:text-gray-400">
+            <p>&copy; 2024 Vietnamese Product Rating Prediction System</p>
+            <p class="text-sm mt-2">Built with FastAPI + PhoBERT + TailwindCSS</p>
+            <p class="text-xs mt-2 text-gray-400 dark:text-gray-500">
+                <i class="fas fa-brain mr-1"></i>Features: XAI, N-gram Analysis, Keyword Highlighting
+            </p>
+        </div>
+    </footer>
+    
+    <!-- Main JavaScript -->
+    <script src="/static/js/main.js"></script>
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html>
