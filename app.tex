@@ -5,224 +5,82 @@
 
 \section{Xây dựng và Triển khai Ứng dụng}
 
-Chương này trình bày chi tiết về kiến trúc hệ thống, giao diện người dùng và quy trình triển khai ứng dụng dự đoán đánh giá sản phẩm từ bình luận tiếng Việt.
+Chương này trình bày kiến trúc hệ thống, giao diện người dùng và quy trình triển khai ứng dụng dự đoán đánh giá sản phẩm từ bình luận tiếng Việt trên nền tảng Hugging Face Spaces.
 
 % ============================================
 % PHẦN 1: KIẾN TRÚC HỆ THỐNG
 % ============================================
 \subsection{Kiến trúc Hệ thống}
 
-Hệ thống được thiết kế theo mô hình \textbf{Client-Server} với kiến trúc phân lớp (Layered Architecture), đảm bảo tính module hóa và dễ dàng bảo trì.
+\subsubsection{Mô hình tổng quan}
 
-\subsubsection{Tổng quan Kiến trúc}
+Hệ thống được thiết kế theo mô hình Client-Server với kiến trúc phân lớp, bao gồm bốn thành phần chính được mô tả trong Bảng \ref{tab:kien_truc}.
 
-Hệ thống bao gồm 4 lớp chính:
+\begin{table}[H]
+\centering
+\caption{Các thành phần trong kiến trúc hệ thống}
+\label{tab:kien_truc}
+\begin{tabular}{|l|l|p{7cm}|}
+\hline
+\textbf{Lớp} & \textbf{Công nghệ} & \textbf{Chức năng} \\
+\hline
+Frontend & HTML, TailwindCSS, JavaScript & Hiển thị giao diện, gửi request qua Fetch API \\
+\hline
+API & FastAPI & Xử lý HTTP request, định tuyến đến các service \\
+\hline
+Service & Python & Xử lý logic nghiệp vụ: xác thực, dự đoán, visualization \\
+\hline
+Database & PostgreSQL & Lưu trữ thông tin người dùng và lịch sử dự đoán \\
+\hline
+\end{tabular}
+\end{table}
 
-\begin{itemize}
-    \item \textbf{Frontend Layer}: Giao diện người dùng được xây dựng bằng HTML/CSS (TailwindCSS) và JavaScript, sử dụng Jinja2 Template Engine để render động.
-    \item \textbf{API Layer}: FastAPI Backend xử lý các HTTP request thông qua RESTful API endpoints.
-    \item \textbf{Service Layer}: Các service xử lý business logic bao gồm Authentication Service, ML Prediction Service và Visualization Service.
-    \item \textbf{Data Layer}: SQLAlchemy ORM kết nối với cơ sở dữ liệu SQLite (development) hoặc PostgreSQL (production).
-\end{itemize}
+Luồng xử lý dữ liệu diễn ra như sau: người dùng nhập bình luận trên giao diện web, JavaScript gửi HTTP POST request đến Backend API. Sau khi xác thực JWT token, hệ thống chuyển request đến ML Service để thực hiện dự đoán. Kết quả được trả về dạng JSON và hiển thị trên giao diện mà không cần tải lại trang.
 
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.9\textwidth]{images/kien_truc_he_thong.png}
-    \caption{Sơ đồ kiến trúc tổng quan của hệ thống}
-    \label{fig:kien_truc_he_thong}
-\end{figure}
+\subsubsection{Cơ chế Lazy Loading}
 
-\subsubsection{Frontend - Giao diện Người dùng}
+Hệ thống áp dụng cơ chế Lazy Loading cho model PhoBERT nhằm tối ưu tài nguyên. Model chỉ được tải vào bộ nhớ khi có request dự đoán đầu tiên, thay vì tải ngay khi khởi động server. Bảng \ref{tab:lazy_loading} trình bày các lợi ích của cơ chế này.
 
-Frontend được xây dựng với các công nghệ:
+\begin{table}[H]
+\centering
+\caption{Lợi ích của cơ chế Lazy Loading}
+\label{tab:lazy_loading}
+\begin{tabular}{|l|p{9cm}|}
+\hline
+\textbf{Lợi ích} & \textbf{Mô tả} \\
+\hline
+Khởi động nhanh & Server khởi động trong vài giây thay vì 30-60 giây \\
+\hline
+Tiết kiệm RAM & Model (~500MB) chỉ chiếm bộ nhớ khi thực sự cần thiết \\
+\hline
+Tối ưu Cold Start & Phù hợp với môi trường container và serverless \\
+\hline
+\end{tabular}
+\end{table}
 
-\begin{itemize}
-    \item \textbf{Jinja2 Templates}: Engine template của Python, tích hợp chặt chẽ với FastAPI để render các trang HTML động.
-    \item \textbf{TailwindCSS}: Framework CSS utility-first giúp xây dựng giao diện responsive và hiện đại.
-    \item \textbf{JavaScript (Fetch API)}: Xử lý các AJAX request để giao tiếp bất đồng bộ với Backend.
-    \item \textbf{Chart.js}: Thư viện visualize để hiển thị biểu đồ phân bố rating.
-\end{itemize}
-
-Khi người dùng thực hiện thao tác (ví dụ: nhập comment và nhấn "Predict"), JavaScript sẽ gửi HTTP POST request đến Backend API, nhận response JSON và cập nhật giao diện mà không cần reload trang.
-
-\subsubsection{Backend - FastAPI Server}
-
-Backend được xây dựng trên framework \textbf{FastAPI} với Python, có các đặc điểm nổi bật:
-
-\begin{itemize}
-    \item \textbf{High Performance}: Xây dựng trên Starlette và Pydantic, FastAPI là một trong những framework Python nhanh nhất.
-    \item \textbf{Auto Documentation}: Tự động sinh Swagger UI (/docs) và ReDoc (/redoc) cho API documentation.
-    \item \textbf{Type Hints}: Sử dụng Python type hints để validation và serialization tự động.
-\end{itemize}
-
-Cấu trúc Router của Backend:
-
-\vietnameselst
-\begin{lstlisting}[language=Python]
-# main.py - Khoi tao FastAPI Application
-from fastapi import FastAPI
-from app.routers import auth, prediction, dashboard
-
-app = FastAPI(
-    title="Vietnamese Product Rating Prediction API",
-    description="ML-powered sentiment analysis for Vietnamese reviews",
-    version="1.0.0"
-)
-
-# Dang ky cac Router
-app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
-app.include_router(prediction.router, prefix="/api/predict", tags=["Prediction"])
-app.include_router(dashboard.router, tags=["Dashboard"])
-\end{lstlisting}
-
-\subsubsection{Cơ chế Lazy Loading của Model}
-
-Một trong những tối ưu quan trọng nhất của hệ thống là cơ chế \textbf{Lazy Loading} cho ML Model. Thay vì load model ngay khi khởi động server (có thể mất 30-60 giây với model PhoBERT ~500MB), model chỉ được load vào RAM khi có request đầu tiên.
-
-\vietnameselst
-\begin{lstlisting}[language=Python]
-class MLPredictionService:
-    """ML Service voi co che Lazy Loading"""
-    
-    def __init__(self):
-        # Chi khoi tao cac bien, KHONG load model
-        self.model = None
-        self.tokenizer = None
-        self.model_loaded = False
-        
-        # Dinh nghia Repo ID chua model tren Hugging Face
-        self.MODEL_REPO_ID = "vtdung23/my-phobert-models"
-        self.MODEL_FILENAME = "best_phoBER.pth"
-        
-        print("ML Service initialized (Model se load khi co request dau tien)")
-    
-    def _load_model(self):
-        """Load model chi khi can thiet (lazy loading)"""
-        if self.model_loaded:
-            return  # Da load roi, khong can load lai
-        
-        print("Dang load ML model (first request)...")
-        
-        # Import cac thu vien nang chi khi can
-        import torch
-        from transformers import AutoTokenizer, RobertaForSequenceClassification
-        from huggingface_hub import hf_hub_download
-        
-        # Tai file weights tu Hugging Face Hub
-        model_path = hf_hub_download(
-            repo_id=self.MODEL_REPO_ID,
-            filename=self.MODEL_FILENAME,
-            repo_type="model"
-        )
-        
-        # Load tokenizer va model
-        self.tokenizer = AutoTokenizer.from_pretrained("vinai/phobert-base")
-        self.model = RobertaForSequenceClassification.from_pretrained(
-            "vinai/phobert-base",
-            num_labels=5
-        )
-        
-        # Load trained weights
-        state_dict = torch.load(model_path, map_location="cpu")
-        self.model.load_state_dict(state_dict)
-        self.model.eval()
-        
-        self.model_loaded = True
-        print("Model loaded thanh cong!")
-    
-    def predict_single(self, text: str):
-        """Du doan rating cho 1 comment"""
-        self._load_model()  # Dam bao model da duoc load
-        # ... logic du doan ...
-\end{lstlisting}
-
-\textbf{Lợi ích của Lazy Loading:}
-\begin{itemize}
-    \item \textbf{Khởi động nhanh}: Server start trong vài giây thay vì phải chờ load model.
-    \item \textbf{Tiết kiệm RAM}: Trên các nền tảng miễn phí (Hugging Face Spaces, Render), RAM bị giới hạn. Model chỉ chiếm RAM khi thực sự cần thiết.
-    \item \textbf{Cold Start Optimization}: Phù hợp với serverless hoặc container-based deployment.
-\end{itemize}
-
-\subsubsection{Luồng Dữ liệu (Data Flow)}
-
-Sơ đồ dưới đây mô tả luồng đi của dữ liệu khi người dùng thực hiện dự đoán:
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.95\textwidth]{images/data_flow.png}
-    \caption{Sơ đồ luồng dữ liệu của hệ thống dự đoán}
-    \label{fig:data_flow}
-\end{figure}
-
-\textbf{Mô tả luồng dữ liệu:}
-
-\begin{enumerate}
-    \item \textbf{User Input}: Người dùng nhập comment tiếng Việt vào form trên Dashboard.
-    \item \textbf{HTTP Request}: JavaScript gửi POST request đến endpoint \texttt{/api/predict/single} với JSON body chứa comment.
-    \item \textbf{Authentication}: Middleware kiểm tra JWT token trong header để xác thực người dùng.
-    \item \textbf{Prediction Router}: Router nhận request, validate input bằng Pydantic schema.
-    \item \textbf{ML Service}: 
-    \begin{itemize}
-        \item Lazy load model nếu chưa được load.
-        \item Tiền xử lý văn bản (word tokenization với Underthesea).
-        \item Tokenize với PhoBERT tokenizer.
-        \item Inference với model PhoBERT fine-tuned.
-        \item Trả về rating (1-5 sao) và confidence score.
-    \end{itemize}
-    \item \textbf{Save History}: Lưu kết quả dự đoán vào database để theo dõi lịch sử.
-    \item \textbf{Response}: Trả về JSON response với rating, confidence, highlighted keywords.
-    \item \textbf{UI Update}: JavaScript nhận response và cập nhật giao diện hiển thị kết quả.
-\end{enumerate}
+Model PhoBERT được lưu trữ trên Hugging Face Hub và tải về thông qua thư viện huggingface\_hub. Tokenizer được tải từ repository gốc vinai/phobert-base.
 
 % ============================================
 % PHẦN 2: GIAO DIỆN VÀ CHỨC NĂNG
 % ============================================
 \subsection{Giao diện và Chức năng}
 
-\subsubsection{Màn hình Đăng nhập và Đăng ký}
+\subsubsection{Màn hình Dashboard}
 
-Hệ thống yêu cầu người dùng đăng nhập trước khi sử dụng các tính năng dự đoán. Việc này giúp:
-\begin{itemize}
-    \item Theo dõi lịch sử dự đoán của từng người dùng.
-    \item Bảo vệ API endpoints khỏi các truy cập trái phép.
-    \item Phân quyền và quản lý người dùng trong tương lai.
-\end{itemize}
-
-Xác thực được thực hiện bằng \textbf{JWT (JSON Web Token)} với thuật toán HS256 và mật khẩu được hash bằng \textbf{bcrypt}.
-
-\subsubsection{Màn hình Dashboard - Giao diện Chính}
-
-Dashboard là màn hình chính của ứng dụng, nơi người dùng thực hiện các thao tác dự đoán. Giao diện được thiết kế theo phong cách hiện đại với TailwindCSS, hỗ trợ cả Light Mode và Dark Mode.
+Dashboard là giao diện chính của ứng dụng, cho phép người dùng thực hiện dự đoán đánh giá. Giao diện được thiết kế responsive với TailwindCSS, hỗ trợ cả chế độ sáng và tối. Hình \ref{fig:giao_dien_chinh} minh họa màn hình Dashboard.
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.9\textwidth]{images/giao_dien_chinh.png}
-    \caption{Màn hình Dashboard - Giao diện chính của ứng dụng}
+    \includegraphics[width=0.85\textwidth]{images/giao_dien_chinh.png}
+    \caption{Màn hình Dashboard với form nhập liệu và kết quả dự đoán}
     \label{fig:giao_dien_chinh}
 \end{figure}
 
-\textbf{Các thành phần chính của Dashboard:}
+Các thành phần chính bao gồm: thanh điều hướng, vùng nhập liệu với hai chế độ (Single Comment và Upload CSV), và khu vực hiển thị kết quả.
 
-\begin{itemize}
-    \item \textbf{Navigation Bar}: Hiển thị tên người dùng và nút Logout.
-    \item \textbf{Welcome Section}: Giới thiệu các tính năng chính của ứng dụng.
-    \item \textbf{Tab Input Mode}: Cho phép chuyển đổi giữa "Single Comment" và "Upload CSV".
-    \item \textbf{Input Area}: Vùng nhập liệu comment hoặc upload file CSV.
-    \item \textbf{Result Section}: Hiển thị kết quả dự đoán với các visualization.
-\end{itemize}
+\subsubsection{Chức năng Dự đoán Đơn lẻ}
 
-\subsubsection{Chức năng Dự đoán Đơn lẻ (Single Prediction)}
-
-Đây là chức năng cơ bản nhất, cho phép người dùng nhập một comment tiếng Việt và nhận kết quả dự đoán.
-
-\textbf{Quy trình sử dụng:}
-\begin{enumerate}
-    \item Chọn tab "Single Comment".
-    \item Nhập comment tiếng Việt vào textarea.
-    \item (Tùy chọn) Bật checkbox "Bao gồm giải thích AI" để nhận word importance.
-    \item Nhấn nút "Predict Rating".
-    \item Xem kết quả hiển thị bên dưới.
-\end{enumerate}
+Chức năng này cho phép người dùng nhập một bình luận tiếng Việt và nhận kết quả dự đoán. Kết quả hiển thị bao gồm: rating dự đoán (1-5 sao), độ tin cậy, bình luận với từ khóa được highlight, và danh sách từ khóa tích cực/tiêu cực. Hình \ref{fig:ket_qua_du_doan} minh họa kết quả dự đoán.
 
 \begin{figure}[H]
     \centering
@@ -231,286 +89,84 @@ Dashboard là màn hình chính của ứng dụng, nơi người dùng thực h
     \label{fig:ket_qua_du_doan}
 \end{figure}
 
-\textbf{Thông tin hiển thị trong kết quả:}
-\begin{itemize}
-    \item \textbf{Predicted Rating}: Số sao dự đoán từ 1-5, hiển thị dạng số và icon sao.
-    \item \textbf{Confidence Score}: Độ tin cậy của dự đoán (0-100\%).
-    \item \textbf{Highlighted Comment}: Comment gốc với các keyword tích cực (xanh) và tiêu cực (đỏ) được highlight.
-    \item \textbf{Keywords Found}: Danh sách các keyword tích cực/tiêu cực được phát hiện.
-    \item \textbf{AI Explanation} (nếu bật): Biểu đồ word importance thể hiện ảnh hưởng của từng từ đến kết quả.
-\end{itemize}
+\subsubsection{Chức năng Dự đoán Hàng loạt}
 
-\subsubsection{Chức năng Dự đoán Hàng loạt (Batch Prediction)}
-
-Tính năng này cho phép upload file CSV chứa nhiều comment để dự đoán đồng thời, phù hợp cho việc phân tích dữ liệu lớn.
-
-\textbf{Yêu cầu file CSV:}
-\begin{lstlisting}[language=Python]
-Comment
-"San pham rat tot, dong goi can than"
-"Chat luong kem, khong nhu mo ta"
-"Giao hang nhanh, san pham on"
-"Rat hai long voi san pham nay"
-\end{lstlisting}
-
-\textbf{Kết quả Batch Prediction bao gồm:}
-
-\begin{itemize}
-    \item \textbf{Rating Distribution Chart}: Biểu đồ tròn/cột thể hiện phân bố số lượng comment theo từng mức rating.
-    \item \textbf{Word Cloud}: Đám mây từ khóa phổ biến trong các comment, kích thước từ tỷ lệ với tần suất xuất hiện.
-    \item \textbf{N-gram Analysis}: Phân tích các cụm từ phổ biến (unigrams, bigrams, trigrams).
-    \item \textbf{Keyword Frequency}: Thống kê tần suất xuất hiện của các keyword tích cực và tiêu cực.
-    \item \textbf{Results Table}: Bảng chi tiết kết quả dự đoán cho từng comment.
-    \item \textbf{Export Options}: Xuất kết quả ra file CSV hoặc PDF report.
-\end{itemize}
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.9\textwidth]{images/batch_result.png}
-    \caption{Kết quả Batch Prediction với biểu đồ và Word Cloud}
-    \label{fig:batch_result}
-\end{figure}
-
-\subsubsection{Các Tính năng Nâng cao}
-
-\textbf{1. Keyword Highlighting:}
-
-Hệ thống tự động nhận diện và highlight các từ khóa tích cực/tiêu cực trong comment:
-
-\vietnameselst
-\begin{lstlisting}[language=Python]
-class KeywordAnalyzer:
-    def __init__(self):
-        # Tu khoa tich cuc
-        self.positive_words = [
-            'tot', 'dep', 'tuyet voi', 'xuat sac', 'hoan hao',
-            'chat luong', 'nhanh', 'hai long', 'ung', 'de thuong'
-        ]
-        # Tu khoa tieu cuc
-        self.negative_words = [
-            'te', 'xau', 'kem', 'that vong', 'loi', 'hong',
-            'cham', 'gia', 'dat', 'khong dang'
-        ]
-    
-    def analyze(self, text: str) -> Dict:
-        """Phan tich text va tra ve cac keyword tim thay"""
-        found_positive = [w for w in self.positive_words if w in text.lower()]
-        found_negative = [w for w in self.negative_words if w in text.lower()]
-        return {
-            'positive_keywords': found_positive,
-            'negative_keywords': found_negative
-        }
-\end{lstlisting}
-
-\textbf{2. N-gram Analysis:}
-
-Phân tích các cụm từ phổ biến giúp hiểu rõ hơn về nội dung các review:
-\begin{itemize}
-    \item \textbf{Unigrams} (1 từ): "tốt", "đẹp", "nhanh"
-    \item \textbf{Bigrams} (2 từ): "giao hàng", "chất lượng", "đóng gói"
-    \item \textbf{Trigrams} (3 từ): "rất hài lòng", "giao hàng nhanh", "đúng như mô tả"
-\end{itemize}
-
-\textbf{3. Word Importance Explanation:}
-
-Khi bật tùy chọn "AI Explanation", hệ thống sẽ hiển thị mức độ ảnh hưởng của từng từ đến kết quả dự đoán, giúp người dùng hiểu tại sao model đưa ra kết quả như vậy.
-
-\subsubsection{Trải nghiệm Người dùng (UX)}
-
-Giao diện được thiết kế với các nguyên tắc UX hiện đại:
-
-\begin{itemize}
-    \item \textbf{Responsive Design}: Tự động điều chỉnh layout trên mọi kích thước màn hình (desktop, tablet, mobile).
-    \item \textbf{Loading States}: Hiển thị skeleton loading khi đang xử lý request, giúp người dùng biết hệ thống đang hoạt động.
-    \item \textbf{Real-time Feedback}: Kết quả hiển thị ngay trên trang mà không cần reload.
-    \item \textbf{Dark Mode Support}: Hỗ trợ chế độ tối để giảm mỏi mắt khi làm việc lâu.
-    \item \textbf{Error Handling}: Thông báo lỗi rõ ràng khi có vấn đề xảy ra.
-\end{itemize}
-
-% ============================================
-% PHẦN 3: TRIỂN KHAI (DEPLOYMENT)
-% ============================================
-\subsection{Triển khai Ứng dụng (Deployment)}
-
-Ứng dụng được thiết kế để có thể triển khai trên nhiều môi trường khác nhau, từ local development đến các nền tảng cloud.
-
-\subsubsection{Triển khai trên Cloud - Hugging Face Spaces}
-
-\textbf{Hugging Face Spaces} là nền tảng hosting miễn phí cho các ứng dụng Machine Learning, được chọn vì các lý do:
-
-\begin{itemize}
-    \item \textbf{Miễn phí}: Cung cấp CPU với 16GB RAM miễn phí, đủ để chạy model PhoBERT.
-    \item \textbf{Docker Support}: Hỗ trợ Docker SDK, cho phép deploy các ứng dụng phức tạp.
-    \item \textbf{Git-based Deployment}: Deploy bằng git push, dễ dàng cập nhật.
-    \item \textbf{Integrated với Hugging Face Hub}: Dễ dàng tải model từ Hub.
-\end{itemize}
-
-\textbf{Cấu hình Dockerfile cho Hugging Face Spaces:}
-
-\begin{lstlisting}[language=Python]
-# Dockerfile for Hugging Face Spaces
-FROM python:3.10-slim
-
-# Cai dat font cho WordCloud
-RUN apt-get update && apt-get install -y \
-    fonts-dejavu fonts-dejavu-core build-essential gcc \
-    && rm -rf /var/lib/apt/lists/*
-
-# Tao non-root user (bat buoc tren HF Spaces)
-RUN useradd -m -u 1000 user
-WORKDIR /app
-
-# Cai dat dependencies
-COPY --chown=user:user requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy source code
-COPY --chown=user:user . .
-
-# Tao thu muc can thiet
-RUN mkdir -p /app/app/static/uploads/wordclouds && \
-    mkdir -p /app/app/database && \
-    chmod -R 777 /app/app/static/uploads
-
-USER user
-EXPOSE 7860
-
-# Start FastAPI (port 7860 bat buoc tren HF Spaces)
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]
-\end{lstlisting}
-
-\textbf{Biến môi trường cần thiết:}
-\begin{itemize}
-    \item \texttt{DATABASE\_URL}: Connection string đến PostgreSQL database.
-    \item \texttt{SECRET\_KEY}: Key bí mật để mã hóa JWT token.
-\end{itemize}
-
-\textbf{Link Demo ứng dụng:}
-
-Ứng dụng hiện đang hoạt động tại: \url{https://huggingface.co/spaces/vtdung23/RatingPrediction}
-
-\subsubsection{Triển khai Local - Cài đặt trên Máy Cá nhân}
-
-Hướng dẫn từng bước để chạy ứng dụng trên máy tính cá nhân:
-
-\textbf{Yêu cầu hệ thống:}
-\begin{itemize}
-    \item Python 3.10 trở lên
-    \item Git (để clone repository)
-    \item RAM tối thiểu 8GB (khuyến nghị 16GB cho model PhoBERT)
-    \item Dung lượng ổ cứng trống: 3GB (cho dependencies và model)
-\end{itemize}
-
-\textbf{Bước 1: Clone Project từ Git}
-
-\begin{lstlisting}[language=bash]
-# Clone repository
-git clone https://github.com/your-username/rating-prediction.git
-
-# Di chuyen vao thu muc project
-cd rating-prediction
-\end{lstlisting}
-
-\textbf{Bước 2: Tạo và Kích hoạt Môi trường ảo}
-
-\vietnameselst
-\begin{lstlisting}[language=bash]
-# Option A: Su dung Conda (khuyen nghi)
-conda create -p ./env python=3.10 -y
-conda activate ./env
-
-# Option B: Su dung venv
-python -m venv env
-
-# Kich hoat tren Windows:
-env\Scripts\activate
-
-# Kich hoat tren Linux/Mac:
-source env/bin/activate
-\end{lstlisting}
-
-\textbf{Bước 3: Cài đặt Thư viện}
-
-\begin{lstlisting}[language=bash]
-# Cai dat tat ca dependencies tu requirements.txt
-pip install -r requirements.txt
-
-# Qua trinh nay co the mat 5-10 phut
-# tuy thuoc vao toc do mang (can tai PyTorch, Transformers)
-\end{lstlisting}
-
-\textbf{Bước 4: Chạy Ứng dụng}
-
-\begin{lstlisting}[language=bash]
-# Chay server development
-python main.py
-
-# Hoac su dung uvicorn truc tiep
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-\end{lstlisting}
-
-\textbf{Bước 5: Truy cập Ứng dụng}
-
-Sau khi server khởi động thành công, mở trình duyệt và truy cập:
-
-\begin{itemize}
-    \item \textbf{Dashboard}: \url{http://localhost:8000}
-    \item \textbf{Swagger API Docs}: \url{http://localhost:8000/docs}
-    \item \textbf{ReDoc}: \url{http://localhost:8000/redoc}
-\end{itemize}
-
-\textbf{Lưu ý quan trọng:}
-\begin{itemize}
-    \item Lần đầu tiên thực hiện dự đoán, hệ thống sẽ tự động tải model PhoBERT từ Hugging Face Hub (~500MB). Quá trình này có thể mất vài phút tùy tốc độ mạng.
-    \item Đảm bảo máy tính có đủ RAM trống (ít nhất 4GB) khi model được load.
-    \item Trên Windows, nếu gặp lỗi với thư viện \texttt{underthesea}, cần cài đặt Visual C++ Build Tools.
-\end{itemize}
-
-\subsubsection{So sánh các Phương pháp Triển khai}
+Tính năng Batch Prediction cho phép upload file CSV chứa nhiều bình luận để dự đoán đồng thời. File CSV cần có cột ``Comment'' chứa nội dung bình luận. Bảng \ref{tab:batch_result} mô tả các thành phần trong kết quả.
 
 \begin{table}[H]
 \centering
-\begin{tabular}{|l|c|c|}
+\caption{Các thành phần trong kết quả Batch Prediction}
+\label{tab:batch_result}
+\begin{tabular}{|l|p{8cm}|}
 \hline
-\textbf{Tiêu chí} & \textbf{Hugging Face Spaces} & \textbf{Local} \\
+\textbf{Thành phần} & \textbf{Mô tả} \\
 \hline
-Chi phí & Miễn phí (CPU 16GB) & Miễn phí \\
+Rating Distribution & Biểu đồ phân bố số lượng bình luận theo từng mức rating \\
 \hline
-Cấu hình & Docker required & Chỉ cần Python \\
+Word Cloud & Đám mây từ khóa thể hiện tần suất xuất hiện của các từ \\
 \hline
-Truy cập & Public URL & localhost only \\
+N-gram Analysis & Thống kê cụm từ phổ biến (1-gram, 2-gram, 3-gram) \\
 \hline
-Uptime & 24/7 (auto sleep) & Khi máy bật \\
+Results Table & Bảng chi tiết kết quả dự đoán cho từng bình luận \\
 \hline
-Phù hợp & Demo, Production & Development, Testing \\
+Export & Xuất kết quả ra file CSV hoặc PDF report \\
 \hline
 \end{tabular}
-\caption{So sánh các phương pháp triển khai}
-\label{tab:deploy_comparison}
 \end{table}
 
-\subsubsection{Cấu trúc Thư mục Project}
+% ============================================
+% PHẦN 3: TRIỂN KHAI
+% ============================================
+\subsection{Triển khai trên Hugging Face Spaces}
 
-\begin{lstlisting}[language=bash]
-RatingPrediction/
-|-- main.py                 # Entry point FastAPI
-|-- requirements.txt        # Python dependencies
-|-- Dockerfile              # Docker configuration
-|-- app/
-|   |-- config.py           # Cau hinh ung dung
-|   |-- database.py         # Database connection
-|   |-- models.py           # SQLAlchemy models
-|   |-- schemas.py          # Pydantic schemas
-|   |-- routers/
-|   |   |-- auth.py         # Authentication endpoints
-|   |   |-- prediction.py   # Prediction endpoints
-|   |   |-- dashboard.py    # Dashboard pages
-|   |-- services/
-|   |   |-- auth_service.py # JWT & password handling
-|   |   |-- ml_service.py   # ML prediction logic
-|   |   |-- visualization_service.py  # Charts, WordCloud
-|   |-- templates/          # Jinja2 HTML templates
-|   |-- static/             # CSS, JS, uploaded files
-\end{lstlisting}
+\subsubsection{Giới thiệu Nền tảng}
 
-Với cấu trúc module hóa này, việc bảo trì và mở rộng ứng dụng trở nên dễ dàng. Mỗi thành phần có trách nhiệm riêng biệt, tuân theo nguyên tắc Single Responsibility Principle.
+Hugging Face Spaces là nền tảng hosting miễn phí cho các ứng dụng Machine Learning, hỗ trợ Docker SDK với 16GB RAM. Bảng \ref{tab:hf_spaces} trình bày các ưu điểm của nền tảng này.
+
+\begin{table}[H]
+\centering
+\caption{Ưu điểm của Hugging Face Spaces}
+\label{tab:hf_spaces}
+\begin{tabular}{|l|p{9cm}|}
+\hline
+\textbf{Ưu điểm} & \textbf{Mô tả} \\
+\hline
+Miễn phí & Cung cấp CPU với 16GB RAM, đủ để chạy model PhoBERT \\
+\hline
+Docker Support & Hỗ trợ Docker SDK cho các ứng dụng phức tạp \\
+\hline
+Git-based & Triển khai đơn giản bằng git push \\
+\hline
+Tích hợp Hub & Dễ dàng tải model từ Hugging Face Hub \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsubsection{Quy trình Triển khai}
+
+Quy trình triển khai ứng dụng gồm ba bước chính:
+
+\begin{enumerate}
+    \item \textbf{Tạo Space}: Truy cập Hugging Face, tạo Space mới với Docker SDK và chọn CPU Basic (16GB RAM).
+    \item \textbf{Cấu hình biến môi trường}: Thiết lập DATABASE\_URL (PostgreSQL connection string) và SECRET\_KEY (JWT secret key) trong phần Settings.
+    \item \textbf{Push code}: Clone repository của Space, copy source code và push lên để trigger quá trình build.
+\end{enumerate}
+
+Ứng dụng sử dụng Dockerfile để định nghĩa môi trường runtime, bao gồm Python 3.10 và cấu hình port 7860 theo yêu cầu của Hugging Face Spaces.
+
+\subsubsection{Kết quả Triển khai}
+
+Ứng dụng đã được triển khai thành công và hoạt động ổn định tại địa chỉ:
+
+\begin{center}
+\url{https://vtdung23-predict-rating.hf.space}
+\end{center}
+
+Người dùng có thể truy cập Dashboard tại đường dẫn trên hoặc API Documentation (Swagger) tại \url{https://vtdung23-predict-rating.hf.space/docs}. Hình \ref{fig:hf_deployment} minh họa giao diện ứng dụng sau khi triển khai.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{images/hf_deployment.png}
+    \caption{Ứng dụng đã được triển khai trên Hugging Face Spaces}
+    \label{fig:hf_deployment}
+\end{figure}

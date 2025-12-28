@@ -36,3 +36,5 @@ app/static/uploads/wordclouds/*
 dist/
 build/
 *.egg-info/
+
+.tex
